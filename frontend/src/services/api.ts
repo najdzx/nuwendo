@@ -1,4 +1,4 @@
-const API_URL = 'http://localhost:5000/api';
+import { API_URL } from '@/config/constants';
 
 // Helper function to get auth headers
 const getAuthHeaders = () => {

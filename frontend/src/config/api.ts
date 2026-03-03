@@ -2,17 +2,17 @@
 // Automatically detects environment and uses correct API URL
 
 const getApiUrl = () => {
-  // If we're on localhost, use local backend
+  // First, check if environment variable is set (production/staging)
+  if (import.meta.env.VITE_API_URL) {
+    return import.meta.env.VITE_API_URL;
+  }
+
+  // If we're on localhost (development), use local backend
   if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
     return 'http://localhost:5000';
   }
   
-  // If we're on production domain, use production API
-  if (window.location.hostname === 'nuwendo.dev' || window.location.hostname === 'www.nuwendo.dev') {
-    return 'https://api.nuwendo.dev';
-  }
-  
-  // Default to localhost for any other case
+  // Default to localhost
   return 'http://localhost:5000';
 };
 
@@ -22,7 +22,8 @@ export const BASE_URL = getApiUrl();
 console.log('🌐 API Configuration:', { 
   hostname: window.location.hostname, 
   API_URL, 
-  BASE_URL 
+  BASE_URL,
+  env: import.meta.env.VITE_API_URL || 'not set'
 });
 
 console.log('🌐 API URL:', API_URL);
