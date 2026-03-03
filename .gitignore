@@ -28,7 +28,7 @@ cloudflared-config*.yml
 # Scripts
 fix-*.ps1
 setup-*.ps1
-start-*.ps1
+dev-jobs.json
 
 # IDE
 .vscode/

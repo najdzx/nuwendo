@@ -630,7 +630,9 @@ export const patientLoginVerifyCode = async (req, res) => {
           email: user.email,
           firstName: user.first_name,
           lastName: user.last_name
-        }
+        Variable: VITE_APP_URL
+        Value: https://frontend-liart-six-87.vercel.app
+        Environment: Production, Preview, Development        }
       }
     });
   } catch (error) {
