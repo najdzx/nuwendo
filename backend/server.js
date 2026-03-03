@@ -17,8 +17,17 @@ import pool from './src/config/database.js';
 const app = express();
 const PORT = process.env.PORT || 5000;
 
+// CORS Configuration
+const corsOptions = {
+  origin: process.env.CORS_ORIGIN || 'https://frontend-liart-six-87.vercel.app',
+  credentials: true,
+  optionsSuccessStatus: 200,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+};
+
 // Middleware
-app.use(cors());
+app.use(cors(corsOptions));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
