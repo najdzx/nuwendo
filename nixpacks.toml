@@ -7,4 +7,4 @@ nixPkgs = ["nodejs_20"]
 cmds = ["cd backend && npm ci --omit=dev || npm install --omit=dev"]
 
 [start]
-cmd = "node start.js"
+cmd = "cd backend && node server.js"
