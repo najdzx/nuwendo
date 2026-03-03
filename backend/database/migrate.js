@@ -11,13 +11,16 @@ const __dirname = path.dirname(__filename);
 dotenv.config({ path: path.join(__dirname, '../backend/.env') });
 
 // Database configuration
-const config = {
-  user: process.env.DB_USER || 'postgres',
-  host: process.env.DB_HOST || 'localhost',
-  database: process.env.DB_NAME || 'nuwendo_db',
-  password: process.env.DB_PASSWORD || 'postgres',
-  port: process.env.DB_PORT || 5432,
-};
+// Use DATABASE_URL if available (Railway), otherwise use individual vars (local)
+const config = process.env.DATABASE_URL 
+  ? { connectionString: process.env.DATABASE_URL, ssl: false }
+  : {
+      user: process.env.DB_USER || 'postgres',
+      host: process.env.DB_HOST || 'localhost',
+      database: process.env.DB_NAME || 'nuwendo_db',
+      password: process.env.DB_PASSWORD || 'postgres',
+      port: process.env.DB_PORT || 5432,
+    };
 
 // Create migrations table to track applied migrations
 const createMigrationsTable = async (client) => {

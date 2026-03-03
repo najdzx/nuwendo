@@ -68,7 +68,12 @@ export const sendVerificationCode = async (req, res) => {
     }
 
     // Send verification email
-    await sendVerificationEmail(email, code);
+    try {
+      await sendVerificationEmail(email, code);
+    } catch (emailError) {
+      console.error('Email sending failed:', emailError);
+      // Continue anyway - code is saved in database
+    }
 
     res.json({
       success: true,
@@ -80,9 +85,15 @@ export const sendVerificationCode = async (req, res) => {
     });
   } catch (error) {
     console.error('Send verification code error:', error);
+    console.error('Error details:', {
+      message: error.message,
+      stack: error.stack,
+      code: error.code
+    });
     res.status(500).json({ 
       success: false,
-      message: 'Server error sending verification code' 
+      message: 'Server error sending verification code',
+      debug: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 };
@@ -448,7 +459,12 @@ export const patientLoginSendCode = async (req, res) => {
     );
 
     // Send verification email
-    await sendVerificationEmail(email, code);
+    try {
+      await sendVerificationEmail(email, code);
+    } catch (emailError) {
+      console.error('Email sending failed:', emailError);
+      // Continue anyway - code is saved in database
+    }
 
     res.json({
       success: true,
@@ -461,9 +477,15 @@ export const patientLoginSendCode = async (req, res) => {
     });
   } catch (error) {
     console.error('Patient login send code error:', error);
+    console.error('Error details:', {
+      message: error.message,
+      stack: error.stack,
+      code: error.code
+    });
     res.status(500).json({ 
       success: false,
-      message: 'Server error sending verification code' 
+      message: 'Server error sending verification code',
+      debug: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 };
