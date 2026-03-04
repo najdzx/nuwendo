@@ -68,19 +68,26 @@ export const sendVerificationCode = async (req, res) => {
     }
 
     // Send verification email
+    let emailSent = false;
     try {
       await sendVerificationEmail(email, code);
+      emailSent = true;
     } catch (emailError) {
       console.error('Email sending failed:', emailError);
       // Continue anyway - code is saved in database
+      console.log('⚠️ Email service unavailable - showing code in logs for development');
+      console.log(`📧 VERIFICATION CODE for ${email}: ${code}`);
     }
 
     res.json({
       success: true,
-      message: 'Verification code sent to your email',
+      message: emailSent 
+        ? 'Verification code sent to your email'
+        : 'Email service temporarily unavailable. Please check console for code.',
       data: {
         email,
-        expiresIn: 600 // seconds
+        expiresIn: 600, // seconds
+        code: process.env.NODE_ENV === 'production' && !emailSent ? code : undefined // Send code in response if email fails in production
       }
     });
   } catch (error) {
@@ -459,20 +466,27 @@ export const patientLoginSendCode = async (req, res) => {
     );
 
     // Send verification email
+    let emailSent = false;
     try {
       await sendVerificationEmail(email, code);
+      emailSent = true;
     } catch (emailError) {
       console.error('Email sending failed:', emailError);
       // Continue anyway - code is saved in database
+      console.log('⚠️ Email service unavailable - showing code in logs for development');
+      console.log(`📧 VERIFICATION CODE for ${email}: ${code}`);
     }
 
     res.json({
       success: true,
       isAdmin: false,
-      message: 'Verification code sent to your email',
+      message: emailSent 
+        ? 'Verification code sent to your email'
+        : 'Email service temporarily unavailable. Please check console for code.',
       data: {
         email,
-        expiresIn: 600 // seconds
+        expiresIn: 600, // seconds
+        code: process.env.NODE_ENV === 'production' && !emailSent ? code : undefined // Send code in response if email fails in production
       }
     });
   } catch (error) {

@@ -57,6 +57,17 @@ export default function Login() {
       } else {
         setIsAdmin(false)
         sessionStorage.setItem('loginEmail', email)
+        
+        // If email service failed and code is provided in response, store it
+        if (data.data?.code) {
+          sessionStorage.setItem('tempLoginCode', data.data.code)
+          alert(`Email service is temporarily down. Your verification code is: ${data.data.code}\n\nIt will be auto-filled.`)
+          
+          // Auto-fill the code
+          const digits = data.data.code.split('')
+          setCode(digits)
+        }
+        
         setStep('code')
         setTimeLeft(60)
       }
@@ -171,9 +182,20 @@ export default function Login() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email })
       })
+      
+      const data = await response.json()
       if (!response.ok) throw new Error('Failed to resend code')
+      
+      // If email service failed and code is provided in response, auto-fill it
+      if (data.data?.code) {
+        alert(`Email service is temporarily down. Your verification code is: ${data.data.code}`)
+        const digits = data.data.code.split('')
+        setCode(digits)
+      } else {
+        setCode(['', '', '', '', '', ''])
+      }
+      
       setTimeLeft(60)
-      setCode(['', '', '', '', '', ''])
     } catch (err: any) {
       setError(err.message || 'Failed to resend verification code')
     } finally {

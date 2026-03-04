@@ -45,6 +45,13 @@ export default function SignUp() {
       }
 
       sessionStorage.setItem('signupEmail', email)
+      
+      // If email service failed and code is provided in response, store it
+      if (data.data?.code) {
+        sessionStorage.setItem('tempVerificationCode', data.data.code)
+        alert(`Email service is temporarily down. Your verification code is: ${data.data.code}\n\nIt will be auto-filled on the next page.`)
+      }
+      
       navigate('/verify-code')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong')

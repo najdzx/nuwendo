@@ -21,7 +21,16 @@ export default function VerifyCode() {
       navigate('/signup')
       return
     }
-    inputRefs.current[0]?.focus()
+    
+    // Check if there's a temporary verification code (in case email service failed)
+    const tempCode = sessionStorage.getItem('tempVerificationCode')
+    if (tempCode && tempCode.length === 6) {
+      const digits = tempCode.split('')
+      setCode(digits)
+      sessionStorage.removeItem('tempVerificationCode')
+    } else {
+      inputRefs.current[0]?.focus()
+    }
     
     const timer = setInterval(() => {
       setTimeLeft((prev) => (prev > 0 ? prev - 1 : 0))
@@ -99,7 +108,18 @@ export default function VerifyCode() {
         body: JSON.stringify({ email }),
       })
 
+      const data = await response.json()
+      
       if (response.ok) {
+        // If email service failed and code is provided in response, auto-fill it
+        if (data.data?.code) {
+          alert(`Email service is temporarily down. Your verification code is: ${data.data.code}`)
+          const digits = data.data.code.split('')
+          setCode(digits)
+        } else {
+          setCode(['', '', '', '', '', ''])
+        }
+        
         setTimeLeft(60)
         setError('')
       }
