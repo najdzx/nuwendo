@@ -15,15 +15,13 @@ backend/*.log
 # Database
 database/*.backup
 
-# Cloudflare
-.cloudflared/
+# JSON files
 *.json
 !package.json
 !tsconfig.json
 !components.json
 !vercel.json
 !railway.json
-cloudflared-config*.yml
 
 # Scripts
 fix-*.ps1
