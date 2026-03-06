@@ -138,7 +138,8 @@ export const getFullPatientProfile = async (req, res) => {
     // Get user with profile
     const userResult = await pool.query(
       `SELECT u.id, u.email, u.first_name, u.last_name,
-              pp.phone_number, pp.address, pp.medical_conditions
+              pp.phone_number, pp.address, pp.medical_conditions,
+              pp.province, pp.city, pp.barangay, pp.street_address
        FROM users u
        LEFT JOIN patient_profiles pp ON u.id = pp.user_id
        WHERE u.email = $1`,
@@ -170,6 +171,10 @@ export const getFullPatientProfile = async (req, res) => {
         email: user.email,
         phone: user.phone_number || '',
         address: user.address || '',
+        province: user.province || '',
+        city: user.city || '',
+        barangay: user.barangay || '',
+        street_address: user.street_address || '',
         age: extendedData.age || '',
         height: extendedData.height || '',
         weight: extendedData.weight || '',

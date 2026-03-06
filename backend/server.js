@@ -14,8 +14,14 @@ import patientShopRoutes from './src/routes/patientShop.js';
 import rescheduleRoutes from './src/routes/reschedule.js';
 import cartRoutes from './src/routes/cart.js';
 import addressesRoutes from './src/routes/addresses.js';
+import uploadRoutes from './src/routes/upload.js';
 import pool from './src/config/database.js';
 import { spawn } from 'child_process';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Check and run migrations if needed
 const checkAndMigrate = async () => {
@@ -162,7 +168,11 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/shop', patientShopRoutes);
 app.use('/api/cart', cartRoutes);
 app.use('/api/addresses', addressesRoutes);
+app.use('/api/upload', uploadRoutes);
 app.use('/api/oauth', googleAuthRoutes); // Google OAuth routes
+
+// Serve uploads directory as static files
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Error handling middleware
 app.use((err, req, res, next) => {

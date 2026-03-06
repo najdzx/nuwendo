@@ -2,9 +2,9 @@ import { useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
-import { Textarea } from '@/components/ui/textarea'
 import { ShoppingCart, Plus, Minus, Trash2, Loader2, AlertCircle } from 'lucide-react'
 import { cartService, Cart as CartType } from '@/services/cartService'
+import CheckoutFlow from './CheckoutFlow'
 
 interface CartModalProps {
   open: boolean
@@ -16,9 +16,7 @@ export default function CartModal({ open, onClose, onCartUpdate }: CartModalProp
   const [cart, setCart] = useState<CartType | null>(null)
   const [loading, setLoading] = useState(false)
   const [updating, setUpdating] = useState<number | null>(null)
-  const [checkingOut, setCheckingOut] = useState(false)
   const [showCheckout, setShowCheckout] = useState(false)
-  const [checkoutNotes, setCheckoutNotes] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
 
@@ -68,25 +66,15 @@ export default function CartModal({ open, onClose, onCartUpdate }: CartModalProp
     }
   }
 
-  const handleCheckout = async () => {
-    try {
-      setCheckingOut(true)
-      setError(null)
-      await cartService.checkout(checkoutNotes)
-      setSuccessMessage('Order placed successfully! Our team will contact you soon.')
-      setShowCheckout(false)
-      setCheckoutNotes('')
-      await loadCart()
-      onCartUpdate?.()
-      setTimeout(() => {
-        setSuccessMessage(null)
-        onClose()
-      }, 3000)
-    } catch (err: any) {
-      setError(err.message || 'Failed to process checkout')
-    } finally {
-      setCheckingOut(false)
-    }
+  const handleCheckoutSuccess = async () => {
+    setSuccessMessage('Order placed successfully! Awaiting payment verification.')
+    setShowCheckout(false)
+    await loadCart()
+    onCartUpdate?.()
+    setTimeout(() => {
+      setSuccessMessage(null)
+      onClose()
+    }, 3000)
   }
 
   if (loading) {
@@ -235,65 +223,11 @@ export default function CartModal({ open, onClose, onCartUpdate }: CartModalProp
             )}
           </>
         ) : (
-          <div className="space-y-4">
-            <div className="border-t border-b py-4">
-              <div className="space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Items ({cart?.itemCount}):</span>
-                  <span className="font-medium">₱{cart?.total.toLocaleString()}</span>
-                </div>
-                <div className="flex justify-between text-lg font-semibold">
-                  <span>Total:</span>
-                  <span className="text-brand">₱{cart?.total.toLocaleString()}</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="space-y-3">
-              <div>
-                <label className="text-sm font-medium text-gray-700 mb-1 block">
-                  Additional Notes (Optional)
-                </label>
-                <Textarea
-                  value={checkoutNotes}
-                  onChange={(e) => setCheckoutNotes(e.target.value)}
-                  placeholder="Add any special instructions or notes..."
-                  rows={3}
-                />
-              </div>
-
-              <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                <p className="text-sm text-blue-800">
-                  Our team will contact you to confirm your order and arrange payment and delivery.
-                </p>
-              </div>
-            </div>
-
-            <div className="flex gap-3">
-              <Button
-                onClick={() => setShowCheckout(false)}
-                variant="outline"
-                className="flex-1"
-                disabled={checkingOut}
-              >
-                Back to Cart
-              </Button>
-              <Button
-                onClick={handleCheckout}
-                className="flex-1 bg-brand hover:bg-brand/90"
-                disabled={checkingOut}
-              >
-                {checkingOut ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                    Processing...
-                  </>
-                ) : (
-                  'Place Order'
-                )}
-              </Button>
-            </div>
-          </div>
+          <CheckoutFlow
+            cart={cart!}
+            onBack={() => setShowCheckout(false)}
+            onSuccess={handleCheckoutSuccess}
+          />
         )}
       </DialogContent>
     </Dialog>

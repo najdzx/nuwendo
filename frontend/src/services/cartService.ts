@@ -84,14 +84,20 @@ export const cartService = {
     if (!data.success) throw new Error(data.message)
   },
 
-  async checkout(notes?: string, paymentReceiptUrl?: string): Promise<any> {
+  async checkout(checkoutData: {
+    notes?: string
+    payment_receipt_url?: string
+    payment_qr_reference?: string
+    use_default_address: boolean
+    delivery_province?: string
+    delivery_city?: string
+    delivery_barangay?: string
+    delivery_street_address?: string
+  }): Promise<any> {
     const response = await fetch(`${BASE_URL}/api/cart/checkout`, {
       method: 'POST',
       headers: getAuthHeaders(),
-      body: JSON.stringify({
-        notes,
-        payment_receipt_url: paymentReceiptUrl
-      })
+      body: JSON.stringify(checkoutData)
     })
     const data = await response.json()
     if (!data.success) throw new Error(data.message)

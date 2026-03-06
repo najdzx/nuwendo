@@ -1,0 +1,558 @@
+import { useState, useEffect } from 'react'
+import { motion } from 'framer-motion'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
+import { Label } from '@/components/ui/label'
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { AlertCircle, ChevronLeft, ChevronRight, Loader2, Upload, CheckCircle } from 'lucide-react'
+import { addressService } from '@/services/addressService'
+import { cartService, Cart as CartType } from '@/services/cartService'
+import { API_URL } from '@/config/api'
+
+interface CheckoutFlowProps {
+  cart: CartType
+  onBack: () => void
+  onSuccess: () => void
+}
+
+interface Province {
+  code: string
+  name: string
+}
+
+interface City {
+  code: string
+  name: string
+}
+
+interface Barangay {
+  code: string
+  name: string
+}
+
+interface PatientProfile {
+  province?: string
+  city?: string
+  barangay?: string
+  street_address?: string
+}
+
+export default function CheckoutFlow({ cart, onBack, onSuccess }: CheckoutFlowProps) {
+  const [step, setStep] = useState(1)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  // Address state
+  const [useDefaultAddress, setUseDefaultAddress] = useState(true)
+  const [defaultProfile, setDefaultProfile] = useState<PatientProfile | null>(null)
+  const [provinces, setProvinces] = useState<Province[]>([])
+  const [cities, setCities] = useState<City[]>([])
+  const [barangays, setBarangays] = useState<Barangay[]>([])
+  const [selectedProvince, setSelectedProvince] = useState('')
+  const [selectedCity, setSelectedCity] = useState('')
+  const [selectedBarangay, setSelectedBarangay] = useState('')
+  const [streetAddress, setStreetAddress] = useState('')
+
+  // Order details
+  const [notes, setNotes] = useState('')
+
+  // Payment state
+  const [paymentQRFile, setPaymentQRFile] = useState<File | null>(null)
+  const [paymentQRPreview, setPaymentQRPreview] = useState<string | null>(null)
+  const [receiptFile, setReceiptFile] = useState<File | null>(null)
+  const [receiptPreview, setReceiptPreview] = useState<string | null>(null)
+
+  // Load default address and provinces on mount
+  useEffect(() => {
+    loadInitialData()
+  }, [])
+
+  const loadInitialData = async () => {
+    try {
+      setLoading(true)
+      const [provincesData, profile] = await Promise.all([
+        addressService.getProvinces(),
+        loadDefaultProfile()
+      ])
+      setProvinces(provincesData)
+      setDefaultProfile(profile)
+    } catch (err: any) {
+      setError(err.message || 'Failed to load data')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const loadDefaultProfile = async (): Promise<PatientProfile> => {
+    const authToken = sessionStorage.getItem('authToken')
+    const response = await fetch(`${API_URL}/patient/profile`, {
+      headers: {
+        'Authorization': `Bearer ${authToken}`,
+        'Content-Type': 'application/json'
+      }
+    })
+    const data = await response.json()
+    if (data.success) {
+      return data.profile || {}
+    }
+    return {}
+  }
+
+  const handleProvinceChange = async (provinceCode: string) => {
+    setSelectedProvince(provinceCode)
+    setSelectedCity('')
+    setSelectedBarangay('')
+    setCities([])
+    setBarangays([])
+    try {
+      const citiesData = await addressService.getCities(provinceCode)
+      setCities(citiesData)
+    } catch (err: any) {
+      setError(err.message || 'Failed to load cities')
+    }
+  }
+
+  const handleCityChange = async (cityCode: string) => {
+    setSelectedCity(cityCode)
+    setSelectedBarangay('')
+    setBarangays([])
+    try {
+      const barangaysData = await addressService.getBarangays(cityCode)
+      setBarangays(barangaysData)
+    } catch (err: any) {
+      setError(err.message || 'Failed to load barangays')
+    }
+  }
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, type: 'qr' | 'receipt') => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    if (!file.type.startsWith('image/')) {
+      setError('Please upload an image file')
+      return
+    }
+
+    const reader = new FileReader()
+    reader.onloadend = () => {
+      if (type === 'qr') {
+        setPaymentQRFile(file)
+        setPaymentQRPreview(reader.result as string)
+      } else {
+        setReceiptFile(file)
+        setReceiptPreview(reader.result as string)
+      }
+    }
+    reader.readAsDataURL(file)
+  }
+
+  const uploadImage = async (file: File): Promise<string> => {
+    const formData = new FormData()
+    formData.append('file', file)
+    
+    const authToken = sessionStorage.getItem('authToken')
+    const response = await fetch(`${API_URL}/upload`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${authToken}`
+      },
+      body: formData
+    })
+    
+    const data = await response.json()
+    if (!data.success) throw new Error(data.message || 'Upload failed')
+    return data.url
+  }
+
+  const handleSubmitOrder = async () => {
+    try {
+      setLoading(true)
+      setError(null)
+
+      // Validate required fields
+      if (!useDefaultAddress) {
+        if (!selectedProvince || !selectedCity || !selectedBarangay || !streetAddress) {
+          setError('Please complete all address fields')
+          return
+        }
+      } else {
+        if (!defaultProfile?.province || !defaultProfile?.city || !defaultProfile?.barangay) {
+          setError('Your default address is incomplete. Please use custom address.')
+          return
+        }
+      }
+
+      if (!receiptFile) {
+        setError('Please upload your payment receipt')
+        return
+      }
+
+      // Upload images
+      let paymentQRUrl = ''
+      let receiptUrl = ''
+
+      if (paymentQRFile) {
+        paymentQRUrl = await uploadImage(paymentQRFile)
+      }
+      receiptUrl = await uploadImage(receiptFile)
+
+      // Submit order
+      const checkoutData = {
+        notes,
+        payment_receipt_url: receiptUrl,
+        payment_qr_reference: paymentQRUrl,
+        use_default_address: useDefaultAddress,
+        delivery_province: useDefaultAddress 
+          ? defaultProfile?.province 
+          : provinces.find(p => p.code === selectedProvince)?.name || selectedProvince,
+        delivery_city: useDefaultAddress 
+          ? defaultProfile?.city 
+          : cities.find(c => c.code === selectedCity)?.name || selectedCity,
+        delivery_barangay: useDefaultAddress 
+          ? defaultProfile?.barangay 
+          : barangays.find(b => b.code === selectedBarangay)?.name || selectedBarangay,
+        delivery_street_address: useDefaultAddress ? defaultProfile?.street_address : streetAddress
+      }
+
+      await cartService.checkout(checkoutData)
+      onSuccess()
+    } catch (err: any) {
+      setError(err.message || 'Failed to place order')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const canProceedFromStep1 = () => {
+    if (useDefaultAddress) {
+      return defaultProfile?.province && defaultProfile?.city && defaultProfile?.barangay
+    }
+    return selectedProvince && selectedCity && selectedBarangay && streetAddress.trim()
+  }
+
+  const canProceedFromStep3 = () => {
+    return receiptFile !== null
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Step Indicator */}
+      <div className="flex items-center justify-between">
+        {[1, 2, 3].map((s) => (
+          <div key={s} className="flex items-center flex-1">
+            <div className={`flex items-center justify-center w-8 h-8 rounded-full ${
+              s === step ? 'bg-brand text-white' : s < step ? 'bg-green-500 text-white' : 'bg-gray-200'
+            }`}>
+              {s < step ? <CheckCircle className="w-5 h-5" /> : s}
+            </div>
+            {s < 3 && (
+              <div className={`flex-1 h-1 mx-2 ${s < step ? 'bg-green-500' : 'bg-gray-200'}`} />
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* Step Labels */}
+      <div className="flex justify-between text-xs text-gray-600 -mt-2">
+        <span className={step === 1 ? 'font-semibold text-brand' : ''}>Delivery</span>
+        <span className={step === 2 ? 'font-semibold text-brand' : ''}>Review</span>
+        <span className={step === 3 ? 'font-semibold text-brand' : ''}>Payment</span>
+      </div>
+
+      {error && (
+        <div className="p-3 bg-red-50 border border-red-200 rounded-lg flex items-start gap-2">
+          <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+          <p className="text-sm text-red-700">{error}</p>
+        </div>
+      )}
+
+      {/* Step Content */}
+      <motion.div
+        key={step}
+        initial={{ opacity: 0, x: 20 }}
+        animate={{ opacity: 1, x: 0 }}
+        exit={{ opacity: 0, x: -20 }}
+        className="space-y-4"
+      >
+        {step === 1 && (
+          <div className="space-y-4">
+            <h3 className="font-semibold text-lg">Delivery Address</h3>
+            
+            <RadioGroup value={useDefaultAddress ? 'default' : 'custom'} onValueChange={(val: string) => setUseDefaultAddress(val === 'default')}>
+              <div className="space-y-3">
+                <div className="flex items-start space-x-2 p-3 border rounded-lg">
+                  <RadioGroupItem value="default" id="default" />
+                  <div className="flex-1">
+                    <Label htmlFor="default" className="font-medium cursor-pointer">
+                      Use Default Address
+                    </Label>
+                    {defaultProfile && defaultProfile.province ? (
+                      <p className="text-sm text-gray-600 mt-1">
+                        {defaultProfile.street_address && `${defaultProfile.street_address}, `}
+                        {defaultProfile.barangay}, {defaultProfile.city}, {defaultProfile.province}
+                      </p>
+                    ) : (
+                      <p className="text-sm text-amber-600 mt-1">
+                        No default address set. Please select custom address.
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex items-start space-x-2 p-3 border rounded-lg">
+                  <RadioGroupItem value="custom" id="custom" />
+                  <Label htmlFor="custom" className="font-medium cursor-pointer">
+                    Use Different Address
+                  </Label>
+                </div>
+              </div>
+            </RadioGroup>
+
+            {!useDefaultAddress && (
+              <div className="space-y-3 pl-6">
+                <div>
+                  <Label htmlFor="province">Province</Label>
+                  <Select value={selectedProvince} onValueChange={handleProvinceChange}>
+                    <SelectTrigger id="province">
+                      <SelectValue placeholder="Select province" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {provinces.map((province) => (
+                        <SelectItem key={province.code} value={province.code}>
+                          {province.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <Label htmlFor="city">City/Municipality</Label>
+                  <Select value={selectedCity} onValueChange={handleCityChange} disabled={!selectedProvince}>
+                    <SelectTrigger id="city">
+                      <SelectValue placeholder="Select city" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {cities.map((city) => (
+                        <SelectItem key={city.code} value={city.code}>
+                          {city.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <Label htmlFor="barangay">Barangay</Label>
+                  <Select value={selectedBarangay} onValueChange={setSelectedBarangay} disabled={!selectedCity}>
+                    <SelectTrigger id="barangay">
+                      <SelectValue placeholder="Select barangay" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {barangays.map((barangay) => (
+                        <SelectItem key={barangay.code} value={barangay.code}>
+                          {barangay.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <Label htmlFor="street">House/Building No., Street Name</Label>
+                  <Input
+                    id="street"
+                    value={streetAddress}
+                    onChange={(e) => setStreetAddress(e.target.value)}
+                    placeholder="e.g., 123 Main Street, Building A"
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {step === 2 && (
+          <div className="space-y-4">
+            <h3 className="font-semibold text-lg">Review Order</h3>
+
+            <div className="space-y-2 border rounded-lg p-4">
+              <h4 className="font-medium text-sm text-gray-700">Order Items</h4>
+              {cart.items.map((item) => (
+                <div key={item.id} className="flex justify-between text-sm py-2 border-b last:border-0">
+                  <div>
+                    <p className="font-medium">{item.item.name}</p>
+                    {item.variant && <p className="text-gray-600 text-xs">{item.variant.name}</p>}
+                    <p className="text-gray-600 text-xs">Qty: {item.quantity}</p>
+                  </div>
+                  <p className="font-medium">₱{item.subtotal.toLocaleString()}</p>
+                </div>
+              ))}
+              <div className="flex justify-between pt-2 font-semibold">
+                <p>Total</p>
+                <p className="text-brand">₱{cart.total.toLocaleString()}</p>
+              </div>
+            </div>
+
+            <div className="border rounded-lg p-4">
+              <h4 className="font-medium text-sm text-gray-700 mb-2">Delivery Address</h4>
+              <p className="text-sm">
+                {useDefaultAddress ? (
+                  <>
+                    {defaultProfile?.street_address && `${defaultProfile.street_address}, `}
+                    {defaultProfile?.barangay}, {defaultProfile?.city}, {defaultProfile?.province}
+                  </>
+                ) : (
+                  <>
+                    {streetAddress}, {barangays.find(b => b.code === selectedBarangay)?.name || selectedBarangay},{' '}
+                    {cities.find(c => c.code === selectedCity)?.name || selectedCity},{' '}
+                    {provinces.find(p => p.code === selectedProvince)?.name || selectedProvince}
+                  </>
+                )}
+              </p>
+            </div>
+
+            <div>
+              <Label htmlFor="notes">Notes (Optional)</Label>
+              <Textarea
+                id="notes"
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="Any special instructions..."
+                rows={3}
+              />
+            </div>
+          </div>
+        )}
+
+        {step === 3 && (
+          <div className="space-y-4">
+            <h3 className="font-semibold text-lg">Payment</h3>
+
+            <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+              <h4 className="font-medium text-sm mb-2">Payment Instructions</h4>
+              <ol className="text-sm text-blue-900 space-y-1 list-decimal list-inside">
+                <li>Scan the QR code below to pay</li>
+                <li>Take a screenshot of your payment QR code (optional)</li>
+                <li>Upload your payment receipt for verification</li>
+              </ol>
+            </div>
+
+            <div className="border rounded-lg p-4 bg-gray-50">
+              <h4 className="font-medium text-sm mb-2">Scan to Pay</h4>
+              <div className="bg-white p-4 rounded-lg border-2 border-dashed">
+                <p className="text-center text-gray-500 text-sm">
+                  QR Code will be displayed here
+                </p>
+                <p className="text-center text-xs text-gray-400 mt-2">
+                  (Admin will provide QR code)
+                </p>
+              </div>
+            </div>
+
+            <div>
+              <Label htmlFor="qr-upload">Upload Payment QR Code (Optional)</Label>
+              <div className="mt-2">
+                <input
+                  id="qr-upload"
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => handleFileChange(e, 'qr')}
+                  className="hidden"
+                />
+                <label
+                  htmlFor="qr-upload"
+                  className="flex items-center justify-center gap-2 px-4 py-3 border-2 border-dashed rounded-lg cursor-pointer hover:bg-gray-50"
+                >
+                  <Upload className="w-5 h-5" />
+                  <span className="text-sm">
+                    {paymentQRFile ? paymentQRFile.name : 'Click to upload screenshot'}
+                  </span>
+                </label>
+                {paymentQRPreview && (
+                  <div className="mt-2">
+                    <img src={paymentQRPreview} alt="QR Preview" className="w-32 h-32 object-cover rounded border" />
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div>
+              <Label htmlFor="receipt-upload">Upload Payment Receipt *</Label>
+              <div className="mt-2">
+                <input
+                  id="receipt-upload"
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => handleFileChange(e, 'receipt')}
+                  className="hidden"
+                />
+                <label
+                  htmlFor="receipt-upload"
+                  className="flex items-center justify-center gap-2 px-4 py-3 border-2 border-dashed rounded-lg cursor-pointer hover:bg-gray-50"
+                >
+                  <Upload className="w-5 h-5" />
+                  <span className="text-sm">
+                    {receiptFile ? receiptFile.name : 'Click to upload receipt'}
+                  </span>
+                </label>
+                {receiptPreview && (
+                  <div className="mt-2">
+                    <img src={receiptPreview} alt="Receipt Preview" className="w-32 h-32 object-cover rounded border" />
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
+              <p className="text-sm text-amber-800">
+                Your order will be processed after payment verification by our admin team.
+              </p>
+            </div>
+          </div>
+        )}
+      </motion.div>
+
+      {/* Navigation Buttons */}
+      <div className="flex gap-3 pt-4 border-t">
+        <Button
+          onClick={step === 1 ? onBack : () => setStep(step - 1)}
+          variant="outline"
+          className="flex-1"
+          disabled={loading}
+        >
+          <ChevronLeft className="w-4 h-4 mr-1" />
+          Back
+        </Button>
+        
+        {step < 3 ? (
+          <Button
+            onClick={() => setStep(step + 1)}
+            className="flex-1 bg-brand hover:bg-brand/90"
+            disabled={step === 1 && !canProceedFromStep1()}
+          >
+            Next
+            <ChevronRight className="w-4 h-4 ml-1" />
+          </Button>
+        ) : (
+          <Button
+            onClick={handleSubmitOrder}
+            className="flex-1 bg-brand hover:bg-brand/90"
+            disabled={loading || !canProceedFromStep3()}
+          >
+            {loading ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                Submitting...
+              </>
+            ) : (
+              'Place Order'
+            )}
+          </Button>
+        )}
+      </div>
+    </div>
+  )
+}
