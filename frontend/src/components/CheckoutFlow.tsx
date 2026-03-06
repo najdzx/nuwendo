@@ -86,8 +86,14 @@ export default function CheckoutFlow({ cart, onBack, onSuccess }: CheckoutFlowPr
   }
 
   const loadDefaultProfile = async (): Promise<PatientProfile> => {
+    const email = sessionStorage.getItem('patientEmail')
+    if (!email) {
+      console.warn('No patient email found in session')
+      return {}
+    }
+    
     const authToken = sessionStorage.getItem('authToken')
-    const response = await fetch(`${API_URL}/patient/profile`, {
+    const response = await fetch(`${API_URL}/patient/profile?email=${encodeURIComponent(email)}`, {
       headers: {
         'Authorization': `Bearer ${authToken}`,
         'Content-Type': 'application/json'
@@ -229,7 +235,11 @@ export default function CheckoutFlow({ cart, onBack, onSuccess }: CheckoutFlowPr
     if (useDefaultAddress) {
       return defaultProfile?.province && defaultProfile?.city && defaultProfile?.barangay
     }
-    return selectedProvince && selectedCity && selectedBarangay && streetAddress.trim()
+    // For custom address, check that we have province name, city name, barangay name, and street
+    return selectedProvince && selectedCity && selectedBarangay && streetAddress.trim() && 
+           provinces.find(p => p.code === selectedProvince) && 
+           cities.find(c => c.code === selectedCity) && 
+           barangays.find(b => b.code === selectedBarangay)
   }
 
   const canProceedFromStep3 = () => {

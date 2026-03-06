@@ -51,7 +51,21 @@ export const getPatientProfile = async (req, res) => {
 export const updatePatientProfile = async (req, res) => {
   try {
     const { email } = req.params;
-    const { firstName, lastName, phone, address, age, height, weight, reasonForConsult, healthGoals } = req.body;
+    const { 
+      firstName, 
+      lastName, 
+      phone, 
+      address, 
+      province, 
+      city, 
+      barangay, 
+      street_address,
+      age, 
+      height, 
+      weight, 
+      reasonForConsult, 
+      healthGoals 
+    } = req.body;
 
     if (!email) {
       return res.status(400).json({ message: 'Email is required' });
@@ -97,22 +111,26 @@ export const updatePatientProfile = async (req, res) => {
     });
 
     if (profileExists.rows.length === 0) {
-      // Create new profile
+      // Create new profile with all address fields
       await pool.query(
-        `INSERT INTO patient_profiles (user_id, phone_number, address, medical_conditions)
-         VALUES ($1, $2, $3, $4)`,
-        [userId, phone || '', address || '', medicalConditionsData]
+        `INSERT INTO patient_profiles (user_id, phone_number, address, province, city, barangay, street_address, medical_conditions)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+        [userId, phone || '', address || '', province || '', city || '', barangay || '', street_address || '', medicalConditionsData]
       );
     } else {
-      // Update existing profile
+      // Update existing profile with all address fields
       await pool.query(
         `UPDATE patient_profiles 
          SET phone_number = COALESCE($1, phone_number),
              address = COALESCE($2, address),
-             medical_conditions = COALESCE($3, medical_conditions),
+             province = COALESCE($3, province),
+             city = COALESCE($4, city),
+             barangay = COALESCE($5, barangay),
+             street_address = COALESCE($6, street_address),
+             medical_conditions = COALESCE($7, medical_conditions),
              updated_at = NOW()
-         WHERE user_id = $4`,
-        [phone, address, medicalConditionsData, userId]
+         WHERE user_id = $8`,
+        [phone, address, province, city, barangay, street_address, medicalConditionsData, userId]
       );
     }
 
