@@ -146,8 +146,8 @@ export default function PatientDetails() {
       // Store patient details in session
       sessionStorage.setItem('patientDetails', JSON.stringify(formData))
       
-      // Also save to backend
-      await fetch(`${BASE_URL}/api/patient/profile/${encodeURIComponent(email)}`, {
+      // Save to backend
+      const response = await fetch(`${BASE_URL}/api/patient/profile/${encodeURIComponent(email)}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json'
@@ -169,10 +169,18 @@ export default function PatientDetails() {
           healthGoals: formData.healthGoals
         })
       })
+
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}))
+        console.error('Profile save failed:', response.status, errData)
+        setError('Failed to save your details. Please try again.')
+        return
+      }
       
       // Navigate to choose service
       navigate('/choose-service')
     } catch (err) {
+      console.error('Profile save error:', err)
       setError('Something went wrong. Please try again.')
     } finally {
       setIsLoading(false)

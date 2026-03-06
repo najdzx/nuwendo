@@ -189,20 +189,42 @@ export const getFullPatientProfile = async (req, res) => {
       return res.status(400).json({ message: 'Email is required' });
     }
 
-    // Get user with profile
-    const userResult = await pool.query(
-      `SELECT u.id, u.email, u.first_name, u.last_name,
-              pp.phone_number, pp.address, pp.medical_conditions,
-              COALESCE(pp.province, '') as province,
-              COALESCE(pp.city, '') as city,
-              COALESCE(pp.barangay, '') as barangay,
-              COALESCE(pp.street_address, '') as street_address,
-              COALESCE(pp.region, '') as region
-       FROM users u
-       LEFT JOIN patient_profiles pp ON u.id = pp.user_id
-       WHERE u.email = $1`,
-      [email]
-    );
+    // Get user with profile — try with region column first, fall back without it
+    let userResult;
+    try {
+      userResult = await pool.query(
+        `SELECT u.id, u.email, u.first_name, u.last_name,
+                pp.phone_number, pp.address, pp.medical_conditions,
+                COALESCE(pp.province, '') as province,
+                COALESCE(pp.city, '') as city,
+                COALESCE(pp.barangay, '') as barangay,
+                COALESCE(pp.street_address, '') as street_address,
+                COALESCE(pp.region, '') as region
+         FROM users u
+         LEFT JOIN patient_profiles pp ON u.id = pp.user_id
+         WHERE u.email = $1`,
+        [email]
+      );
+    } catch (queryErr) {
+      if (queryErr.message && queryErr.message.includes('region')) {
+        // region column doesn't exist yet — retry without it
+        userResult = await pool.query(
+          `SELECT u.id, u.email, u.first_name, u.last_name,
+                  pp.phone_number, pp.address, pp.medical_conditions,
+                  COALESCE(pp.province, '') as province,
+                  COALESCE(pp.city, '') as city,
+                  COALESCE(pp.barangay, '') as barangay,
+                  COALESCE(pp.street_address, '') as street_address,
+                  '' as region
+           FROM users u
+           LEFT JOIN patient_profiles pp ON u.id = pp.user_id
+           WHERE u.email = $1`,
+          [email]
+        );
+      } else {
+        throw queryErr;
+      }
+    }
 
     if (userResult.rows.length === 0) {
       return res.status(404).json({ message: 'User not found' });
