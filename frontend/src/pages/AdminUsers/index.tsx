@@ -66,7 +66,6 @@ export function AdminUsers() {
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedPatient, setSelectedPatient] = useState<PatientProfile | null>(null)
   const [isLoadingPatient, setIsLoadingPatient] = useState(false)
-  const [deletingUserId, setDeletingUserId] = useState<number | null>(null)
   const [confirmDeleteUser, setConfirmDeleteUser] = useState<UserData | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
 
