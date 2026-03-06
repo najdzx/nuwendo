@@ -55,7 +55,8 @@ export const updatePatientProfile = async (req, res) => {
       firstName, 
       lastName, 
       phone, 
-      address, 
+      address,
+      region,
       province, 
       city, 
       barangay, 
@@ -98,6 +99,52 @@ export const updatePatientProfile = async (req, res) => {
     // Check if patient_profile exists
     const profileExists = await pool.query(
       'SELECT id FROM patient_profiles WHERE user_id = $1',
+      [userId]
+    );
+
+    // Build medical_conditions JSON with extra fields
+    const medicalConditionsData = JSON.stringify({
+      age: age || '',
+      height: height || '',
+      weight: weight || '',
+      reasonForConsult: reasonForConsult || '',
+      healthGoals: healthGoals || []
+    });
+
+    if (profileExists.rows.length === 0) {
+      // Create new profile with all address fields
+      await pool.query(
+        `INSERT INTO patient_profiles (user_id, phone_number, address, region, province, city, barangay, street_address, medical_conditions)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+        [userId, phone || '', address || '', region || '', province || '', city || '', barangay || '', street_address || '', medicalConditionsData]
+      );
+    } else {
+      // Update existing profile with all address fields
+      await pool.query(
+        `UPDATE patient_profiles 
+         SET phone_number = COALESCE($1, phone_number),
+             address = COALESCE($2, address),
+             region = COALESCE($3, region),
+             province = COALESCE($4, province),
+             city = COALESCE($5, city),
+             barangay = COALESCE($6, barangay),
+             street_address = COALESCE($7, street_address),
+             medical_conditions = COALESCE($8, medical_conditions),
+             updated_at = NOW()
+         WHERE user_id = $9`,
+        [phone, address, region, province, city, barangay, street_address, medicalConditionsData, userId]
+      );
+    }
+
+    res.json({
+      success: true,
+      message: 'Profile updated successfully'
+    });
+  } catch (error) {
+    console.error('Update patient profile error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
       [userId]
     );
 
@@ -157,7 +204,7 @@ export const getFullPatientProfile = async (req, res) => {
     const userResult = await pool.query(
       `SELECT u.id, u.email, u.first_name, u.last_name,
               pp.phone_number, pp.address, pp.medical_conditions,
-              pp.province, pp.city, pp.barangay, pp.street_address
+              pp.region, pp.province, pp.city, pp.barangay, pp.street_address
        FROM users u
        LEFT JOIN patient_profiles pp ON u.id = pp.user_id
        WHERE u.email = $1`,
@@ -189,6 +236,7 @@ export const getFullPatientProfile = async (req, res) => {
         email: user.email,
         phone: user.phone_number || '',
         address: user.address || '',
+        region: user.region || '',
         province: user.province || '',
         city: user.city || '',
         barangay: user.barangay || '',

@@ -1,13 +1,23 @@
 import express from 'express';
-import { philippineAddresses, getBarangays } from '../data/philippineAddresses.js';
+import { philippineAddresses, getProvincesByRegion, getBarangays } from '../data/philippineAddresses.js';
 
 const router = express.Router();
 
-// Get all provinces
-router.get('/provinces', (req, res) => {
+// Get all regions
+router.get('/regions', (req, res) => {
   res.json({
     success: true,
-    provinces: philippineAddresses.provinces
+    regions: philippineAddresses.regions
+  });
+});
+
+// Get provinces by region
+router.get('/provinces/:regionCode', (req, res) => {
+  const { regionCode } = req.params;
+  const provinces = getProvincesByRegion(regionCode);
+  res.json({
+    success: true,
+    provinces
   });
 });
 

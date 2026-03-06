@@ -33,6 +33,7 @@ interface Barangay {
 }
 
 interface PatientProfile {
+  region?: string
   province?: string
   city?: string
   barangay?: string
@@ -47,9 +48,11 @@ export default function CheckoutFlow({ cart, onBack, onSuccess }: CheckoutFlowPr
   // Address state
   const [useDefaultAddress, setUseDefaultAddress] = useState(true)
   const [defaultProfile, setDefaultProfile] = useState<PatientProfile | null>(null)
+  const [regions, setRegions] = useState<Province[]>([])
   const [provinces, setProvinces] = useState<Province[]>([])
   const [cities, setCities] = useState<City[]>([])
   const [barangays, setBarangays] = useState<Barangay[]>([])
+  const [selectedRegion, setSelectedRegion] = useState('')
   const [selectedProvince, setSelectedProvince] = useState('')
   const [selectedCity, setSelectedCity] = useState('')
   const [selectedBarangay, setSelectedBarangay] = useState('')
@@ -72,11 +75,11 @@ export default function CheckoutFlow({ cart, onBack, onSuccess }: CheckoutFlowPr
   const loadInitialData = async () => {
     try {
       setLoading(true)
-      const [provincesData, profile] = await Promise.all([
-        addressService.getProvinces(),
+      const [regionsData, profile] = await Promise.all([
+        addressService.getRegions(),
         loadDefaultProfile()
       ])
-      setProvinces(provincesData)
+      setRegions(regionsData)
       setDefaultProfile(profile)
     } catch (err: any) {
       setError(err.message || 'Failed to load data')
@@ -104,6 +107,22 @@ export default function CheckoutFlow({ cart, onBack, onSuccess }: CheckoutFlowPr
       return data.profile || {}
     }
     return {}
+  }
+
+  const handleRegionChange = async (regionCode: string) => {
+    setSelectedRegion(regionCode)
+    setSelectedProvince('')
+    setSelectedCity('')
+    setSelectedBarangay('')
+    setProvinces([])
+    setCities([])
+    setBarangays([])
+    try {
+      const provincesData = await addressService.getProvinces(regionCode)
+      setProvinces(provincesData)
+    } catch (err: any) {
+      setError(err.message || 'Failed to load provinces')
+    }
   }
 
   const handleProvinceChange = async (provinceCode: string) => {
@@ -179,12 +198,12 @@ export default function CheckoutFlow({ cart, onBack, onSuccess }: CheckoutFlowPr
 
       // Validate required fields
       if (!useDefaultAddress) {
-        if (!selectedProvince || !selectedCity || !selectedBarangay || !streetAddress) {
+        if (!selectedRegion || !selectedProvince || !selectedCity || !selectedBarangay || !streetAddress) {
           setError('Please complete all address fields')
           return
         }
       } else {
-        if (!defaultProfile?.province || !defaultProfile?.city || !defaultProfile?.barangay) {
+        if (!defaultProfile?.region || !defaultProfile?.province || !defaultProfile?.city || !defaultProfile?.barangay) {
           setError('Your default address is incomplete. Please use custom address.')
           return
         }
@@ -210,6 +229,9 @@ export default function CheckoutFlow({ cart, onBack, onSuccess }: CheckoutFlowPr
         payment_receipt_url: receiptUrl,
         payment_qr_reference: paymentQRUrl,
         use_default_address: useDefaultAddress,
+        delivery_region: useDefaultAddress 
+          ? defaultProfile?.region 
+          : regions.find(r => r.code === selectedRegion)?.name || selectedRegion,
         delivery_province: useDefaultAddress 
           ? defaultProfile?.province 
           : provinces.find(p => p.code === selectedProvince)?.name || selectedProvince,
@@ -233,10 +255,11 @@ export default function CheckoutFlow({ cart, onBack, onSuccess }: CheckoutFlowPr
 
   const canProceedFromStep1 = () => {
     if (useDefaultAddress) {
-      return defaultProfile?.province && defaultProfile?.city && defaultProfile?.barangay
+      return defaultProfile?.region && defaultProfile?.province && defaultProfile?.city && defaultProfile?.barangay
     }
-    // For custom address, check that we have province name, city name, barangay name, and street
-    return selectedProvince && selectedCity && selectedBarangay && streetAddress.trim() && 
+    // For custom address, check that we have region, province, city, barangay, and street
+    return selectedRegion && selectedProvince && selectedCity && selectedBarangay && streetAddress.trim() && 
+           regions.find(r => r.code === selectedRegion) && 
            provinces.find(p => p.code === selectedProvince) && 
            cities.find(c => c.code === selectedCity) && 
            barangays.find(b => b.code === selectedBarangay)
@@ -323,8 +346,24 @@ export default function CheckoutFlow({ cart, onBack, onSuccess }: CheckoutFlowPr
             {!useDefaultAddress && (
               <div className="space-y-3 pl-6">
                 <div>
+                  <Label htmlFor="region">Region</Label>
+                  <Select value={selectedRegion} onValueChange={handleRegionChange}>
+                    <SelectTrigger id="region">
+                      <SelectValue placeholder="Select region" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {regions.map((region) => (
+                        <SelectItem key={region.code} value={region.code}>
+                          {region.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
                   <Label htmlFor="province">Province</Label>
-                  <Select value={selectedProvince} onValueChange={handleProvinceChange}>
+                  <Select value={selectedProvince} onValueChange={handleProvinceChange} disabled={!selectedRegion}>
                     <SelectTrigger id="province">
                       <SelectValue placeholder="Select province" />
                     </SelectTrigger>
@@ -412,13 +451,14 @@ export default function CheckoutFlow({ cart, onBack, onSuccess }: CheckoutFlowPr
                 {useDefaultAddress ? (
                   <>
                     {defaultProfile?.street_address && `${defaultProfile.street_address}, `}
-                    {defaultProfile?.barangay}, {defaultProfile?.city}, {defaultProfile?.province}
+                    {defaultProfile?.barangay}, {defaultProfile?.city}, {defaultProfile?.province}, {defaultProfile?.region}
                   </>
                 ) : (
                   <>
                     {streetAddress}, {barangays.find(b => b.code === selectedBarangay)?.name || selectedBarangay},{' '}
                     {cities.find(c => c.code === selectedCity)?.name || selectedCity},{' '}
-                    {provinces.find(p => p.code === selectedProvince)?.name || selectedProvince}
+                    {provinces.find(p => p.code === selectedProvince)?.name || selectedProvince},{' '}
+                    {regions.find(r => r.code === selectedRegion)?.name || selectedRegion}
                   </>
                 )}
               </p>

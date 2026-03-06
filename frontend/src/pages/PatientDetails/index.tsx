@@ -23,6 +23,7 @@ export default function PatientDetails() {
     lastName: '',
     age: '',
     contactNumber: '',
+    region: '',
     province: '',
     city: '',
     barangay: '',
@@ -33,20 +34,39 @@ export default function PatientDetails() {
     healthGoals: [] as string[]
   })
 
+  const [regions, setRegions] = useState<Array<{code: string, name: string}>>([])
   const [provinces, setProvinces] = useState<Array<{code: string, name: string}>>([])
   const [cities, setCities] = useState<Array<{code: string, name: string}>>([])
   const [barangays, setBarangays] = useState<Array<{code: string, name: string}>>([])
+  const [selectedRegionCode, setSelectedRegionCode] = useState('')
   const [selectedProvinceCode, setSelectedProvinceCode] = useState('')
   const [selectedCityCode, setSelectedCityCode] = useState('')
 
   useEffect(() => {
-    loadProvinces()
+    loadRegions()
   }, [])
 
-  const loadProvinces = async () => {
+  const loadRegions = async () => {
     try {
-      const data = await addressService.getProvinces()
-      setProvinces(data)
+      const data = await addressService.getRegions()
+      setRegions(data)
+    } catch (err) {
+      console.error('Failed to load regions:', err)
+    }
+  }
+
+  const handleRegionChange = async (regionCode: string) => {
+    setSelectedRegionCode(regionCode)
+    const region = regions.find(r => r.code === regionCode)
+    setFormData({ ...formData, region: region?.name || '', province: '', city: '', barangay: '' })
+    setSelectedProvinceCode('')
+    setSelectedCityCode('')
+    setProvinces([])
+    setCities([])
+    setBarangays([])
+    try {
+      const provincesData = await addressService.getProvinces(regionCode)
+      setProvinces(provincesData)
     } catch (err) {
       console.error('Failed to load provinces:', err)
     }
@@ -114,7 +134,7 @@ export default function PatientDetails() {
       return
     }
 
-    if (!formData.province || !formData.city || !formData.barangay || !formData.streetAddress) {
+    if (!formData.region || !formData.province || !formData.city || !formData.barangay || !formData.streetAddress) {
       setError('Please complete all address fields')
       return
     }
@@ -136,7 +156,8 @@ export default function PatientDetails() {
           firstName: formData.firstName,
           lastName: formData.lastName,
           phone: formData.contactNumber,
-          address: `${formData.streetAddress}, ${formData.barangay}, ${formData.city}, ${formData.province}`,
+          address: `${formData.streetAddress}, ${formData.barangay}, ${formData.city}, ${formData.province}, ${formData.region}`,
+          region: formData.region,
           province: formData.province,
           city: formData.city,
           barangay: formData.barangay,
@@ -254,10 +275,26 @@ export default function PatientDetails() {
             <div className="space-y-4">
               <Label className="text-base font-semibold">Complete Address *</Label>
               
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="region">Region</Label>
+                  <Select value={selectedRegionCode} onValueChange={handleRegionChange}>
+                    <SelectTrigger id="region">
+                      <SelectValue placeholder="Select region" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {regions.map((region) => (
+                        <SelectItem key={region.code} value={region.code}>
+                          {region.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
                 <div className="space-y-2">
                   <Label htmlFor="province">Province</Label>
-                  <Select value={selectedProvinceCode} onValueChange={handleProvinceChange}>
+                  <Select value={selectedProvinceCode} onValueChange={handleProvinceChange} disabled={!selectedRegionCode}>
                     <SelectTrigger id="province">
                       <SelectValue placeholder="Select province" />
                     </SelectTrigger>
