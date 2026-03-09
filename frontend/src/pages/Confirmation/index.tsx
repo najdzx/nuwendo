@@ -61,6 +61,12 @@ export default function Confirmation() {
       sessionStorage.setItem('isAuthenticated', 'true')
       sessionStorage.setItem('patientEmail', signupEmail)
       sessionStorage.removeItem('signupEmail')
+      // ensure authToken is in localStorage as well (was stored in sessionStorage during VerifyCode)
+      const token = sessionStorage.getItem('authToken') || localStorage.getItem('authToken')
+      if (token) {
+        sessionStorage.setItem('authToken', token)
+        localStorage.setItem('authToken', token)
+      }
       navigate('/dashboard')
     } else if (isLoggedIn) {
       navigate('/dashboard')
