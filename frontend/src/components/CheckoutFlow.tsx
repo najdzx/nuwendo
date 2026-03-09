@@ -51,6 +51,8 @@ export default function CheckoutFlow({ cart, onBack, onSuccess }: CheckoutFlowPr
   // Address state
   const [useDefaultAddress, setUseDefaultAddress] = useState(true)
   const [defaultProfile, setDefaultProfile] = useState<PatientProfile | null>(null)
+  const [recipientName, setRecipientName] = useState('')
+  const [recipientPhone, setRecipientPhone] = useState('')
   const [regions, setRegions] = useState<Province[]>([])
   const [provinces, setProvinces] = useState<Province[]>([])
   const [cities, setCities] = useState<City[]>([])
@@ -126,7 +128,7 @@ export default function CheckoutFlow({ cart, onBack, onSuccess }: CheckoutFlowPr
     console.log('Profile data:', data)
     if (data.success) {
       const p = data.profile || {}
-      return {
+      const profile = {
         firstName: p.firstName || '',
         lastName: p.lastName || '',
         phone: p.phone || '',
@@ -136,6 +138,9 @@ export default function CheckoutFlow({ cart, onBack, onSuccess }: CheckoutFlowPr
         barangay: p.barangay || '',
         street_address: p.street_address || '',
       }
+      setRecipientName([p.firstName, p.lastName].filter(Boolean).join(' '))
+      setRecipientPhone(p.phone || '')
+      return profile
     }
     return {}
   }
@@ -248,6 +253,8 @@ export default function CheckoutFlow({ cart, onBack, onSuccess }: CheckoutFlowPr
       const checkoutData = {
         notes,
         payment_receipt_url: receiptUrl,
+        recipient_name: recipientName,
+        recipient_phone: recipientPhone,
         use_default_address: useDefaultAddress,
         delivery_region: useDefaultAddress 
           ? defaultProfile?.region 
@@ -274,11 +281,10 @@ export default function CheckoutFlow({ cart, onBack, onSuccess }: CheckoutFlowPr
   }
 
   const canProceedFromStep1 = () => {
+    if (!recipientName.trim() || !recipientPhone.trim()) return false
     if (useDefaultAddress) {
-      // Allow proceeding if at least province and city are set (region may be missing from old data)
       return defaultProfile?.province && defaultProfile?.city && defaultProfile?.barangay
     }
-    // For custom address, check that we have region, province, city, barangay, and street
     return selectedRegion && selectedProvince && selectedCity && selectedBarangay && streetAddress.trim() && 
            regions.find(r => r.code === selectedRegion) && 
            provinces.find(p => p.code === selectedProvince) && 
@@ -361,18 +367,28 @@ export default function CheckoutFlow({ cart, onBack, onSuccess }: CheckoutFlowPr
             <h3 className="font-semibold text-lg">Delivery Address</h3>
 
             {/* Recipient Info */}
-            <div className="p-3 border rounded-lg bg-gray-50 space-y-1">
-              <h4 className="text-sm font-medium text-gray-700">Recipient</h4>
-              {defaultProfile?.firstName || defaultProfile?.lastName ? (
-                <p className="text-sm">{[defaultProfile.firstName, defaultProfile.lastName].filter(Boolean).join(' ')}</p>
-              ) : (
-                <p className="text-sm text-amber-600">Name not set in your profile</p>
-              )}
-              {defaultProfile?.phone ? (
-                <p className="text-sm text-gray-600">{defaultProfile.phone}</p>
-              ) : (
-                <p className="text-sm text-amber-600">Phone number not set in your profile</p>
-              )}
+            <div className="p-3 border rounded-lg bg-gray-50 space-y-3">
+              <h4 className="text-sm font-medium text-gray-700">Recipient Details</h4>
+              <div>
+                <Label htmlFor="recipient-name">Full Name</Label>
+                <Input
+                  id="recipient-name"
+                  value={recipientName}
+                  onChange={(e) => setRecipientName(e.target.value)}
+                  placeholder="e.g. Juan dela Cruz"
+                  className="mt-1 bg-white"
+                />
+              </div>
+              <div>
+                <Label htmlFor="recipient-phone">Phone Number</Label>
+                <Input
+                  id="recipient-phone"
+                  value={recipientPhone}
+                  onChange={(e) => setRecipientPhone(e.target.value)}
+                  placeholder="e.g. 09123456789"
+                  className="mt-1 bg-white"
+                />
+              </div>
             </div>
             
             <RadioGroup value={useDefaultAddress ? 'default' : 'custom'} onValueChange={(val: string) => setUseDefaultAddress(val === 'default')}>
@@ -509,13 +525,11 @@ export default function CheckoutFlow({ cart, onBack, onSuccess }: CheckoutFlowPr
 
             <div className="border rounded-lg p-4">
               <h4 className="font-medium text-sm text-gray-700 mb-2">Delivery Details</h4>
-              {(defaultProfile?.firstName || defaultProfile?.lastName) && (
-                <p className="text-sm font-medium">
-                  {[defaultProfile.firstName, defaultProfile.lastName].filter(Boolean).join(' ')}
-                </p>
+              {recipientName && (
+                <p className="text-sm font-medium">{recipientName}</p>
               )}
-              {defaultProfile?.phone && (
-                <p className="text-sm text-gray-600 mb-1">{defaultProfile.phone}</p>
+              {recipientPhone && (
+                <p className="text-sm text-gray-600 mb-1">{recipientPhone}</p>
               )}
               <p className="text-sm">
                 {useDefaultAddress ? (
