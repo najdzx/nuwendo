@@ -138,11 +138,8 @@ export default function PatientDashboard() {
 
   useEffect(() => {
     const patientEmail = sessionStorage.getItem('patientEmail')
-    const authToken = localStorage.getItem('authToken') || sessionStorage.getItem('authToken')
     
-    if (!patientEmail || !authToken) {
-      sessionStorage.clear()
-      localStorage.removeItem('authToken')
+    if (!patientEmail) {
       navigate('/login')
       return
     }
@@ -698,11 +695,13 @@ export default function PatientDashboard() {
 
   // Cart functions
   const loadCartCount = async () => {
+    const token = localStorage.getItem('authToken') || sessionStorage.getItem('authToken')
+    if (!token) return
     try {
       const cart = await cartService.getCart()
       setCartItemCount(cart.itemCount)
     } catch (err) {
-      console.error('Failed to load cart count:', err)
+      // silently ignore - user may not have cart access yet
     }
   }
 
@@ -716,6 +715,12 @@ export default function PatientDashboard() {
   const handleAddToCart = async () => {
     if (!selectedShopItem || !selectedVariant) return
     
+    const token = localStorage.getItem('authToken') || sessionStorage.getItem('authToken')
+    if (!token) {
+      setCartMessage({ type: 'error', text: 'Your session has expired. Please log in again.' })
+      return
+    }
+
     try {
       setAddingToCart(true)
       await cartService.addToCart(selectedShopItem.id, selectedVariant.id, itemQuantity)
